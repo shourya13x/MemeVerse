@@ -30,11 +30,11 @@ class Meme {
     spoiler = json['spoiler'];
     author = json['author'];
     ups = json['ups'];
-    preview = json['preview'].cast<String>();
+    preview = json['preview'] != null ? json['preview'].cast<String>() : null;
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data =  Map<String, dynamic>();
+    final data = <String, dynamic>{};
     data['postLink'] = postLink;
     data['subreddit'] = subreddit;
     data['title'] = title;

@@ -1,6 +1,10 @@
 import 'package:api_integration/main.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:api_integration/models/meme_model.dart';
+import 'package:api_integration/services/favorites_service.dart';
+import 'package:api_integration/screens/favorites_screen.dart';
+import 'package:share_plus/share_plus.dart';
 
 class MemeCard extends StatefulWidget {
   final String title;
@@ -9,6 +13,7 @@ class MemeCard extends StatefulWidget {
   final String postLink;
   final int index;
   final String subreddit;
+  final Function(Meme)? onAddToFavorites;
 
   const MemeCard({
     super.key,
@@ -18,6 +23,7 @@ class MemeCard extends StatefulWidget {
     required this.postLink,
     required this.index,
     required this.subreddit,
+    this.onAddToFavorites,
   });
 
   @override
@@ -30,6 +36,8 @@ class _MemeCardState extends State<MemeCard>
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
   bool _isHovered = false;
+  bool _isFavorite = false;
+  bool _isLoadingFavorite = false;
 
   @override
   void initState() {
@@ -48,6 +56,7 @@ class _MemeCardState extends State<MemeCard>
     );
 
     _animationController.forward();
+    _checkFavoriteStatus();
   }
 
   @override
@@ -56,9 +65,114 @@ class _MemeCardState extends State<MemeCard>
     super.dispose();
   }
 
+  Future<void> _checkFavoriteStatus() async {
+    final meme = Meme(
+      title: widget.title,
+      url: widget.imageUrl,
+      ups: widget.ups,
+      postLink: widget.postLink,
+      subreddit: widget.subreddit,
+    );
+
+    final isFavorite = await FavoritesService.isFavorite(meme);
+    if (mounted) {
+      setState(() {
+        _isFavorite = isFavorite;
+      });
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_isLoadingFavorite) return;
+
+    print('Toggling favorite for: ${widget.title}');
+    print('Current favorite status: $_isFavorite');
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    final meme = Meme(
+      title: widget.title,
+      url: widget.imageUrl,
+      ups: widget.ups,
+      postLink: widget.postLink,
+      subreddit: widget.subreddit,
+    );
+
+    bool success = false;
+    if (_isFavorite) {
+      // Remove from favorites
+      print('Removing from favorites...');
+      success = await FavoritesService.removeFromFavorites(meme);
+      print('Remove result: $success');
+      if (success && mounted) {
+        setState(() {
+          _isFavorite = false;
+        });
+
+        // Show feedback
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Removed from favorites 💔'),
+              backgroundColor: Color(0xFF9C27B0),
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } else {
+      // Add to favorites
+      print('Adding to favorites...');
+      success = await FavoritesService.addToFavorites(meme);
+      print('Add result: $success');
+      if (success && mounted) {
+        setState(() {
+          _isFavorite = true;
+        });
+
+        // Show feedback
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('❤️ Added to favorites!'),
+              backgroundColor: const Color(0xFFE91E63),
+              behavior: SnackBarBehavior.floating,
+              action: SnackBarAction(
+                label: 'View Favorites',
+                textColor: Colors.white,
+                onPressed: () {
+                  // Navigate to favorites screen
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const FavoritesScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        }
+      }
+    }
+
+    // Call the parent callback if provided and operation was successful
+    if (success && widget.onAddToFavorites != null) {
+      print('Calling parent callback...');
+      widget.onAddToFavorites!(meme);
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoadingFavorite = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return AnimatedBuilder(
@@ -81,13 +195,13 @@ class _MemeCardState extends State<MemeCard>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.blue.withOpacity(0.18),
+                      color: Colors.blue.withAlpha(18),
                       blurRadius: _isHovered ? 30 : 20,
                       offset: Offset(0, _isHovered ? 15 : 10),
                       spreadRadius: _isHovered ? 3 : 0,
                     ),
                     BoxShadow(
-                      color: Colors.green.withOpacity(0.14),
+                      color: Colors.green.withAlpha(14),
                       blurRadius: _isHovered ? 25 : 15,
                       offset: Offset(0, _isHovered ? 10 : 6),
                     ),
@@ -116,12 +230,8 @@ class _MemeCardState extends State<MemeCard>
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                       colors: [
-                                        const Color(
-                                          0xFF6C5CE7,
-                                        ).withOpacity(0.1),
-                                        const Color(
-                                          0xFF00B4D8,
-                                        ).withOpacity(0.1),
+                                        const Color(0xFF6C5CE7).withAlpha(16),
+                                        const Color(0xFF00B4D8).withAlpha(16),
                                       ],
                                     ),
                                   ),
@@ -137,10 +247,10 @@ class _MemeCardState extends State<MemeCard>
                                                 colors: [
                                                   const Color(
                                                     0xFF6C5CE7,
-                                                  ).withOpacity(0.1),
+                                                  ).withAlpha(16),
                                                   const Color(
                                                     0xFF00B4D8,
-                                                  ).withOpacity(0.1),
+                                                  ).withAlpha(16),
                                                 ],
                                               ),
                                             ),
@@ -183,10 +293,10 @@ class _MemeCardState extends State<MemeCard>
                                                         colors: [
                                                           const Color(
                                                             0xFF6C5CE7,
-                                                          ).withOpacity(0.2),
+                                                          ).withAlpha(32),
                                                           const Color(
                                                             0xFF00B4D8,
-                                                          ).withOpacity(0.2),
+                                                          ).withAlpha(32),
                                                         ],
                                                       ),
                                                       borderRadius:
@@ -215,10 +325,8 @@ class _MemeCardState extends State<MemeCard>
                                             decoration: BoxDecoration(
                                               gradient: LinearGradient(
                                                 colors: [
-                                                  Colors.red.withOpacity(0.1),
-                                                  Colors.orange.withOpacity(
-                                                    0.1,
-                                                  ),
+                                                  Colors.red.withAlpha(16),
+                                                  Colors.orange.withAlpha(16),
                                                 ],
                                               ),
                                             ),
@@ -275,7 +383,7 @@ class _MemeCardState extends State<MemeCard>
                                         end: Alignment.bottomCenter,
                                         colors: [
                                           Colors.transparent,
-                                          Colors.black.withOpacity(0.1),
+                                          Colors.black.withAlpha(16),
                                         ],
                                         stops: const [0.7, 1.0],
                                       ),
@@ -288,49 +396,63 @@ class _MemeCardState extends State<MemeCard>
                                   top: 12,
                                   right: 12,
                                   child: Container(
-                                    decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          Color(0xFFFF6B9D),
-                                          Color(0xFFFF8E53),
-                                        ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(
-                                            0xFFFF6B9D,
-                                          ).withOpacity(0.4),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: IconButton(
-                                      icon: const Icon(
-                                        Icons.favorite_rounded,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: const Text(
-                                              '❤️ Added to favorites!',
-                                            ),
-                                            backgroundColor: const Color(
-                                              0xFFFF6B9D,
-                                            ),
-                                            behavior: SnackBarBehavior.floating,
-                                            shape: RoundedRectangleBorder(
+                                    decoration:
+                                        _isFavorite
+                                            ? BoxDecoration(
+                                              gradient: const LinearGradient(
+                                                colors: [
+                                                  Color(0xFFFF5722),
+                                                  Color(0xFFE91E63),
+                                                ],
+                                              ),
                                               borderRadius:
                                                   BorderRadius.circular(12),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: const Color(
+                                                    0xFFFF5722,
+                                                  ).withAlpha(64),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 4),
+                                                ),
+                                              ],
+                                            )
+                                            : const BoxDecoration(
+                                              color: Colors.transparent,
                                             ),
-                                          ),
-                                        );
-                                      },
+                                    child: IconButton(
+                                      icon:
+                                          _isLoadingFavorite
+                                              ? SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.white),
+                                                ),
+                                              )
+                                              : Icon(
+                                                _isFavorite
+                                                    ? Icons.favorite_rounded
+                                                    : Icons
+                                                        .favorite_border_rounded,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
+                                      onPressed:
+                                          _isLoadingFavorite
+                                              ? null
+                                              : () {
+                                                if (widget.onAddToFavorites !=
+                                                    null) {
+                                                  _toggleFavorite();
+                                                } else {
+                                                  _toggleFavorite();
+                                                }
+                                              },
                                     ),
                                   ),
                                 ),
@@ -341,14 +463,7 @@ class _MemeCardState extends State<MemeCard>
                           // Content Section
                           Container(
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Colors.white.withOpacity(0.95),
-                                  Colors.white.withOpacity(0.85),
-                                ],
-                              ),
+                              color: Theme.of(context).colorScheme.surface,
                             ),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -360,16 +475,6 @@ class _MemeCardState extends State<MemeCard>
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      'r/${widget.subreddit}',
-                                      style: textTheme.labelMedium?.copyWith(
-                                        color: Colors.blue.shade700,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
                                     ShaderMask(
                                       shaderCallback:
                                           (bounds) => const LinearGradient(
@@ -411,7 +516,7 @@ class _MemeCardState extends State<MemeCard>
                                                 boxShadow: [
                                                   BoxShadow(
                                                     color: Colors.blue.shade600
-                                                        .withOpacity(0.3),
+                                                        .withAlpha(48),
                                                     blurRadius: 8,
                                                     offset: const Offset(0, 4),
                                                   ),
@@ -450,7 +555,7 @@ class _MemeCardState extends State<MemeCard>
                                                 boxShadow: [
                                                   BoxShadow(
                                                     color: Colors.green.shade600
-                                                        .withOpacity(0.3),
+                                                        .withAlpha(48),
                                                     blurRadius: 12,
                                                     offset: const Offset(0, 6),
                                                   ),
@@ -504,6 +609,76 @@ class _MemeCardState extends State<MemeCard>
                                               ),
                                             ),
                                           ),
+                                          const SizedBox(width: 8),
+                                          // Share Button
+                                          Flexible(
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.purple.shade600,
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors
+                                                        .purple
+                                                        .shade600
+                                                        .withAlpha(48),
+                                                    blurRadius: 12,
+                                                    offset: const Offset(0, 6),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Material(
+                                                color: Colors.transparent,
+                                                child: InkWell(
+                                                  onTap: () async {
+                                                    // Share meme using share_plus
+                                                    final shareText =
+                                                        '${widget.title}\n${widget.imageUrl}';
+                                                    await Share.share(
+                                                      shareText,
+                                                    );
+                                                  },
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                  child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 20,
+                                                          vertical: 12,
+                                                        ),
+                                                    child: Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(
+                                                          Icons.share_rounded,
+                                                          size: 18,
+                                                          color: Colors.white,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 8,
+                                                        ),
+                                                        Text(
+                                                          'Share',
+                                                          style: textTheme
+                                                              .labelLarge
+                                                              ?.copyWith(
+                                                                color:
+                                                                    Colors
+                                                                        .white,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -535,24 +710,23 @@ class _MemeCardState extends State<MemeCard>
   }
 
   void _showMemeDetails(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder:
             (context, animation, secondaryAnimation) => Scaffold(
-              backgroundColor: colorScheme.surface,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               appBar: AppBar(
                 title: Text(
                   'Meme Details',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
-                backgroundColor: colorScheme.surface,
-                foregroundColor: colorScheme.onSurface,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
                 elevation: 0,
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back_rounded),
@@ -570,7 +744,10 @@ class _MemeCardState extends State<MemeCard>
                       height: 300,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
-                        color: colorScheme.surfaceContainerHighest,
+                        color:
+                            Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: Hero(
@@ -581,7 +758,7 @@ class _MemeCardState extends State<MemeCard>
                           placeholder:
                               (context, url) => Center(
                                 child: CircularProgressIndicator(
-                                  color: colorScheme.primary,
+                                  color: Theme.of(context).colorScheme.primary,
                                 ),
                               ),
                           errorWidget:
@@ -589,7 +766,10 @@ class _MemeCardState extends State<MemeCard>
                                 child: Icon(
                                   Icons.broken_image_rounded,
                                   size: 64,
-                                  color: colorScheme.onSurfaceVariant,
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                         ),
@@ -603,7 +783,7 @@ class _MemeCardState extends State<MemeCard>
                       widget.title,
                       style: textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
 
@@ -614,20 +794,26 @@ class _MemeCardState extends State<MemeCard>
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer,
+                        color: Theme.of(context).colorScheme.secondaryContainer,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
                           Icon(
                             Icons.arrow_upward_rounded,
-                            color: colorScheme.onSecondaryContainer,
+                            color:
+                                Theme.of(
+                                  context,
+                                ).colorScheme.onSecondaryContainer,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             '${_formatNumber(widget.ups)} upvotes',
                             style: textTheme.titleMedium?.copyWith(
-                              color: colorScheme.onSecondaryContainer,
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).colorScheme.onSecondaryContainer,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -642,7 +828,7 @@ class _MemeCardState extends State<MemeCard>
                       'Original Post Link',
                       style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
 
@@ -652,16 +838,19 @@ class _MemeCardState extends State<MemeCard>
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHigh,
+                        color:
+                            Theme.of(context).colorScheme.surfaceContainerHigh,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: colorScheme.outline.withOpacity(0.2),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.outline.withAlpha(32),
                         ),
                       ),
                       child: SelectableText(
                         widget.postLink,
                         style: textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.primary,
+                          color: Theme.of(context).colorScheme.primary,
                           fontFamily: 'monospace',
                         ),
                       ),
@@ -678,7 +867,8 @@ class _MemeCardState extends State<MemeCard>
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: const Text('Link copied to clipboard!'),
-                              backgroundColor: colorScheme.inverseSurface,
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.inverseSurface,
                               behavior: SnackBarBehavior.floating,
                             ),
                           );

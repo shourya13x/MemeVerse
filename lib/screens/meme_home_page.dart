@@ -2,11 +2,25 @@ import 'package:api_integration/models/meme_model.dart';
 import 'package:api_integration/widgets/meme_card.dart';
 import 'package:flutter/material.dart';
 import 'package:api_integration/services/meme_service.dart';
-import 'package:flutter/rendering.dart';
+import 'package:api_integration/services/favorites_service.dart';
+import 'package:api_integration/screens/favorites_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:ui';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class MemeHomePage extends StatefulWidget {
-  const MemeHomePage({super.key});
+  final bool isDarkMode;
+  final void Function(bool) onToggleDarkMode;
+  final String themeColor;
+  final void Function(String) onThemeColorChanged;
+  const MemeHomePage({
+    super.key,
+    required this.isDarkMode,
+    required this.onToggleDarkMode,
+    required this.themeColor,
+    required this.onThemeColorChanged,
+  });
 
   @override
   State<MemeHomePage> createState() => _MemeHomePageState();
@@ -24,6 +38,68 @@ class _MemeHomePageState extends State<MemeHomePage>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+  // Add emoji state
+  final List<String> _emojis = [
+    '😎',
+    '😂',
+    '🤣',
+    '🥳',
+    '🤓',
+    '😜',
+    '😇',
+    '🤩',
+    '😏',
+    '😺',
+    '👾',
+    '😬',
+    '😅',
+    '😈',
+    '🤠',
+    '😃',
+    '😆',
+    '😋',
+    '😱',
+    '😻',
+    '🙃',
+    '😛',
+    '😝',
+    '😸',
+    '😹',
+    '😺',
+    '😻',
+    '😼',
+    '😽',
+    '🙀',
+    '😿',
+    '😾',
+    '👻',
+    '👽',
+    '🤖',
+    '🤑',
+    '🥸',
+    '😎',
+    '😺',
+    '😹',
+    '😻',
+    '😼',
+    '😽',
+    '🙀',
+    '😿',
+    '😾',
+    '👻',
+    '👽',
+    '🤖',
+    '🤑',
+    '🥸',
+  ];
+  String _currentEmoji = '😎';
+
+  void _changeEmoji() {
+    setState(() {
+      _currentEmoji = (_emojis..shuffle()).first;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -35,6 +111,7 @@ class _MemeHomePageState extends State<MemeHomePage>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     fetchMemes();
+    _loadFavorites();
     _scrollController.addListener(_onScroll);
   }
 
@@ -43,6 +120,19 @@ class _MemeHomePageState extends State<MemeHomePage>
     _scrollController.dispose();
     _animationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadFavorites() async {
+    try {
+      final favorites = await FavoritesService.getFavorites();
+      if (mounted) {
+        setState(() {
+          favoriteMemes = favorites;
+        });
+      }
+    } catch (e) {
+      print('Error loading favorites: $e');
+    }
   }
 
   void _onScroll() {
@@ -130,9 +220,9 @@ class _MemeHomePageState extends State<MemeHomePage>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFFE91E63).withOpacity(0.05),
-              const Color(0xFF2196F3).withOpacity(0.03),
-              const Color(0xFFFF9800).withOpacity(0.02),
+              const Color(0xFFE91E63).withAlpha(5),
+              const Color(0xFF2196F3).withAlpha(3),
+              const Color(0xFFFF9800).withAlpha(2),
               colorScheme.surface,
             ],
             stops: const [0.0, 0.3, 0.7, 1.0],
@@ -148,6 +238,7 @@ class _MemeHomePageState extends State<MemeHomePage>
                     memes.clear();
                     currentPage = 1;
                   });
+                  _changeEmoji();
                   await fetchMemes();
                 },
                 backgroundColor: colorScheme.surface,
@@ -171,135 +262,201 @@ class _MemeHomePageState extends State<MemeHomePage>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFFE91E63).withOpacity(0.15),
-                  const Color(0xFF2196F3).withOpacity(0.12),
-                  const Color(0xFFFF9800).withOpacity(0.10),
-                  const Color(0xFF9C27B0).withOpacity(0.08),
+                  const Color(0xFFE91E63).withAlpha(180),
+                  const Color(0xFF2196F3).withAlpha(160),
+                  const Color(0xFFFF9800).withAlpha(120),
+                  const Color(0xFF9C27B0).withAlpha(120),
                 ],
+                stops: const [0.0, 0.3, 0.7, 1.0],
               ),
               borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(30),
-                bottomRight: Radius.circular(30),
+                bottomLeft: Radius.circular(18),
+                bottomRight: Radius.circular(18),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFE91E63).withOpacity(0.2),
-                  blurRadius: 25,
-                  offset: const Offset(0, 10),
+                  color: const Color(0xFFE91E63).withAlpha(40),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFE91E63), Color(0xFFFF5722)],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFE91E63).withOpacity(0.4),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.menu_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        onPressed: () {
-                          Scaffold.of(context).openDrawer();
-                        },
-                      ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(18),
+                bottomRight: Radius.circular(18),
+              ),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
                     ),
-                    const SizedBox(width: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFE91E63), Color(0xFFFF5722)],
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFE91E63).withOpacity(0.5),
-                            blurRadius: 15,
-                            offset: const Offset(0, 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Menu Icon
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFE91E63), Color(0xFFFF5722)],
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFE91E63).withAlpha(40),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.mood_rounded,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Meme Explorer",
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                              foreground:
-                                  Paint()
-                                    ..shader = const LinearGradient(
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.menu_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            onPressed: () {
+                              Scaffold.of(context).openDrawer();
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        // App Icon
+                        GestureDetector(
+                          onTap: _changeEmoji,
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFE91E63), Color(0xFFFF5722)],
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFE91E63).withAlpha(50),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              _currentEmoji,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        // Title & Subtitle
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ShaderMask(
+                                shaderCallback:
+                                    (bounds) => const LinearGradient(
                                       colors: [
                                         Color(0xFFE91E63),
                                         Color(0xFF2196F3),
                                       ],
-                                    ).createShader(
-                                      const Rect.fromLTWH(0, 0, 200, 70),
-                                    ),
-                            ),
+                                    ).createShader(bounds),
+                                child: const Text(
+                                  "Meme Explorer",
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                "Discover amazing memes",
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: colorScheme.onSurface.withAlpha(160),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            "Discover amazing memes",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: colorScheme.onSurface.withOpacity(0.7),
-                              fontWeight: FontWeight.w500,
+                        ),
+                        // Refresh Icon
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFF2196F3).withAlpha(80),
+                                const Color(0xFF9C27B0).withAlpha(80),
+                              ],
                             ),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF2196F3).withOpacity(0.3),
-                            const Color(0xFF9C27B0).withOpacity(0.3),
-                          ],
+                          child: IconButton(
+                            padding: const EdgeInsets.all(4),
+                            icon: Icon(
+                              Icons.refresh_rounded,
+                              color: colorScheme.primary,
+                              size: 18,
+                            ),
+                            onPressed:
+                                isLoading
+                                    ? null
+                                    : () async {
+                                      setState(() {
+                                        memes.clear();
+                                        currentPage = 1;
+                                      });
+                                      _changeEmoji();
+                                      await fetchMemes();
+                                    },
+                            tooltip: 'Refresh memes',
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: IconButton(
-                        icon: Icon(
-                          Icons.refresh_rounded,
-                          color: colorScheme.primary,
+                        const SizedBox(width: 7),
+                        // Settings Icon
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFFFF5722).withAlpha(80),
+                                const Color(0xFFE91E63).withAlpha(80),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: IconButton(
+                            padding: const EdgeInsets.all(4),
+                            icon: const Icon(
+                              Icons.settings_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            onPressed: () {
+                              _showSettings(context);
+                            },
+                            tooltip: 'Settings',
+                          ),
                         ),
-                        onPressed: () {
-                          setState(() {
-                            memes.clear();
-                            currentPage = 1;
-                          });
-                          fetchMemes();
-                        },
-                        tooltip: 'Refresh memes',
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -318,7 +475,7 @@ class _MemeHomePageState extends State<MemeHomePage>
       },
       icon: const Icon(Icons.keyboard_arrow_up_rounded),
       label: const Text("Top"),
-      backgroundColor: const Color(0xFFFF9800),
+      backgroundColor: const Color(0xFFFF9800).withAlpha(255),
       foregroundColor: Colors.white,
       elevation: 12,
     );
@@ -335,7 +492,7 @@ class _MemeHomePageState extends State<MemeHomePage>
               decoration: BoxDecoration(
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFFE91E63).withOpacity(0.2),
+                    const Color(0xFFE91E63).withAlpha(20),
                     Colors.transparent,
                   ],
                 ),
@@ -352,8 +509,8 @@ class _MemeHomePageState extends State<MemeHomePage>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFFE91E63).withOpacity(0.2),
-                    const Color(0xFF2196F3).withOpacity(0.2),
+                    const Color(0xFFE91E63).withAlpha(20),
+                    const Color(0xFF2196F3).withAlpha(20),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(25),
@@ -381,13 +538,13 @@ class _MemeHomePageState extends State<MemeHomePage>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFFFF5722).withOpacity(0.1),
-                  const Color(0xFFFF9800).withOpacity(0.1),
+                  const Color(0xFFFF5722).withAlpha(16),
+                  const Color(0xFFFF9800).withAlpha(16),
                 ],
               ),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: const Color(0xFFFF5722).withOpacity(0.3),
+                color: const Color(0xFFFF5722).withAlpha(48),
                 width: 1,
               ),
             ),
@@ -435,7 +592,7 @@ class _MemeHomePageState extends State<MemeHomePage>
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFE91E63).withOpacity(0.5),
+                        color: const Color(0xFFE91E63).withAlpha(80),
                         blurRadius: 15,
                         offset: const Offset(0, 6),
                       ),
@@ -468,7 +625,7 @@ class _MemeHomePageState extends State<MemeHomePage>
               decoration: BoxDecoration(
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFFFF9800).withOpacity(0.3),
+                    const Color(0xFFFF9800).withAlpha(32),
                     Colors.transparent,
                   ],
                 ),
@@ -524,6 +681,7 @@ class _MemeHomePageState extends State<MemeHomePage>
                   postLink: meme.postLink ?? '',
                   index: index,
                   subreddit: meme.subreddit ?? '',
+                  onAddToFavorites: addToFavorites,
                 );
               }, childCount: memes.length),
             ),
@@ -538,7 +696,7 @@ class _MemeHomePageState extends State<MemeHomePage>
                     decoration: BoxDecoration(
                       gradient: RadialGradient(
                         colors: [
-                          const Color(0xFF2196F3).withOpacity(0.2),
+                          const Color(0xFF2196F3).withAlpha(48),
                           Colors.transparent,
                         ],
                       ),
@@ -567,9 +725,9 @@ class _MemeHomePageState extends State<MemeHomePage>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              const Color(0xFFE91E63).withOpacity(0.1),
-              const Color(0xFF2196F3).withOpacity(0.08),
-              const Color(0xFFFF9800).withOpacity(0.06),
+              const Color(0xFFE91E63).withAlpha(16),
+              const Color(0xFF2196F3).withAlpha(12),
+              const Color(0xFFFF9800).withAlpha(8),
               Colors.white,
             ],
           ),
@@ -582,8 +740,8 @@ class _MemeHomePageState extends State<MemeHomePage>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFFE91E63).withOpacity(0.2),
-                    const Color(0xFF2196F3).withOpacity(0.15),
+                    const Color(0xFFE91E63).withAlpha(24),
+                    const Color(0xFF2196F3).withAlpha(18),
                   ],
                 ),
               ),
@@ -598,7 +756,7 @@ class _MemeHomePageState extends State<MemeHomePage>
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFE91E63).withOpacity(0.4),
+                          color: const Color(0xFFE91E63).withAlpha(64),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                         ),
@@ -628,7 +786,7 @@ class _MemeHomePageState extends State<MemeHomePage>
                     "Your favorite memes",
                     style: TextStyle(
                       fontSize: 14,
-                      color: colorScheme.onSurface.withOpacity(0.7),
+                      color: colorScheme.onSurface.withOpacity(0.85),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -649,16 +807,19 @@ class _MemeHomePageState extends State<MemeHomePage>
                     onTap: () {
                       Navigator.pop(context);
                     },
+                    colorScheme: colorScheme,
                   ),
                   _buildDrawerItem(
                     icon: Icons.favorite_rounded,
                     title: "Favorites",
-                    subtitle: "Your saved memes",
+                    subtitle: "${favoriteMemes.length} saved memes",
                     color: const Color(0xFFFF5722),
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
+                      await _loadFavorites(); // Refresh favorites before showing screen
                       _showFavorites(context);
                     },
+                    colorScheme: colorScheme,
                   ),
                   _buildDrawerItem(
                     icon: Icons.trending_up_rounded,
@@ -669,6 +830,7 @@ class _MemeHomePageState extends State<MemeHomePage>
                       Navigator.pop(context);
                       _showTrending(context);
                     },
+                    colorScheme: colorScheme,
                   ),
                   _buildDrawerItem(
                     icon: Icons.settings_rounded,
@@ -679,6 +841,7 @@ class _MemeHomePageState extends State<MemeHomePage>
                       Navigator.pop(context);
                       _showSettings(context);
                     },
+                    colorScheme: colorScheme,
                   ),
 
                   const Divider(height: 32, thickness: 1),
@@ -689,13 +852,38 @@ class _MemeHomePageState extends State<MemeHomePage>
                       horizontal: 20,
                       vertical: 8,
                     ),
-                    child: Text(
-                      "Recent Favorites",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.onSurface,
-                      ),
+                    child: Row(
+                      children: [
+                        Text(
+                          "Recent Favorites",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFF5722), Color(0xFFE91E63)],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            "${favoriteMemes.length}",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 
@@ -705,26 +893,38 @@ class _MemeHomePageState extends State<MemeHomePage>
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         children: [
-                          Icon(
-                            Icons.favorite_border_rounded,
-                            size: 48,
-                            color: Colors.grey[400],
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: RadialGradient(
+                                colors: [
+                                  const Color(0xFFFF5722).withAlpha(32),
+                                  Colors.transparent,
+                                ],
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.favorite_border_rounded,
+                              size: 48,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
                           Text(
                             "No favorites yet",
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey[600],
+                              color: colorScheme.onSurface,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 8),
                           Text(
                             "Tap the heart icon on memes to add them here",
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey[500],
+                              color: colorScheme.onSurfaceVariant,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -733,7 +933,7 @@ class _MemeHomePageState extends State<MemeHomePage>
                     )
                   else
                     ...favoriteMemes
-                        .take(10)
+                        .take(3)
                         .map(
                           (meme) => _buildFavoriteMemeItem(
                             title: meme.title ?? 'Untitled Meme',
@@ -741,14 +941,29 @@ class _MemeHomePageState extends State<MemeHomePage>
                             color: const Color(0xFFE91E63),
                             onTap: () {
                               Navigator.pop(context);
-                              _showMemeDetails(context, meme);
+                              _showFavorites(context);
                             },
-                            onLongPress: () {
-                              removeFromFavorites(meme);
+                            onLongPress: () async {
+                              await removeFromFavorites(meme);
+                              await _loadFavorites(); // Refresh the list
                             },
+                            colorScheme: colorScheme,
                           ),
-                        )
-                        .toList(),
+                        ),
+                  if (favoriteMemes.length > 3)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Center(
+                        child: Text(
+                          "And ${favoriteMemes.length - 3} more favorites...",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -763,8 +978,8 @@ class _MemeHomePageState extends State<MemeHomePage>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFFE91E63).withOpacity(0.2),
-                          const Color(0xFF2196F3).withOpacity(0.2),
+                          const Color(0xFFE91E63).withAlpha(24),
+                          const Color(0xFF2196F3).withAlpha(18),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(12),
@@ -780,19 +995,42 @@ class _MemeHomePageState extends State<MemeHomePage>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          "Meme Explorer v1.0",
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onSurface,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              "Meme Explorer v1.0",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () async {
+                                final url = Uri.parse(
+                                  'https://www.linkedin.com/in/shouryagupta13/',
+                                );
+                                if (await canLaunchUrl(url)) {
+                                  await launchUrl(
+                                    url,
+                                    mode: LaunchMode.externalApplication,
+                                  );
+                                }
+                              },
+                              child: Icon(
+                                FontAwesomeIcons.linkedin,
+                                color: Color(0xFF0A66C2),
+                                size: 18,
+                              ),
+                            ),
+                          ],
                         ),
                         Text(
                           "Made with ❤️ by Shourya",
                           style: TextStyle(
                             fontSize: 10,
-                            color: colorScheme.onSurface.withOpacity(0.6),
+                            color: colorScheme.onSurface.withAlpha(112),
                           ),
                         ),
                       ],
@@ -813,13 +1051,14 @@ class _MemeHomePageState extends State<MemeHomePage>
     required String subtitle,
     required Color color,
     required VoidCallback onTap,
+    required ColorScheme colorScheme,
   }) {
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [color.withOpacity(0.2), color.withOpacity(0.1)],
+            colors: [color.withAlpha(64), color.withAlpha(32)],
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -827,11 +1066,18 @@ class _MemeHomePageState extends State<MemeHomePage>
       ),
       title: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+          color: colorScheme.onSurface,
+        ),
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        style: TextStyle(
+          fontSize: 12,
+          color: colorScheme.onSurface.withOpacity(0.7),
+        ),
       ),
       onTap: onTap,
       trailing: Icon(
@@ -848,6 +1094,7 @@ class _MemeHomePageState extends State<MemeHomePage>
     required Color color,
     required VoidCallback onTap,
     required VoidCallback onLongPress,
+    required ColorScheme colorScheme,
   }) {
     return ListTile(
       leading: Container(
@@ -856,7 +1103,7 @@ class _MemeHomePageState extends State<MemeHomePage>
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           gradient: LinearGradient(
-            colors: [color.withOpacity(0.8), color.withOpacity(0.6)],
+            colors: [color.withAlpha(192), color.withAlpha(128)],
           ),
         ),
         child: ClipRRect(
@@ -872,13 +1119,20 @@ class _MemeHomePageState extends State<MemeHomePage>
       ),
       title: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+          color: colorScheme.onSurface,
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
         "Tap to view",
-        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        style: TextStyle(
+          fontSize: 12,
+          color: colorScheme.onSurface.withOpacity(0.7),
+        ),
       ),
       onTap: onTap,
       onLongPress: onLongPress,
@@ -886,31 +1140,27 @@ class _MemeHomePageState extends State<MemeHomePage>
   }
 
   void _showFavorites(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Favorites feature coming soon! ❤️'),
-        backgroundColor: Color(0xFFE91E63),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const FavoritesScreen()));
   }
 
   void _showTrending(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Trending memes coming soon! 🔥'),
-        backgroundColor: Color(0xFFFF9800),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => _TrendingMemesScreen()));
   }
 
   void _showSettings(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Settings coming soon! ⚙️'),
-        backgroundColor: Color(0xFF9C27B0),
-        behavior: SnackBarBehavior.floating,
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (context) => _SettingsScreen(
+              isDarkMode: widget.isDarkMode,
+              onToggleDarkMode: widget.onToggleDarkMode,
+              themeColor: widget.themeColor,
+              onThemeColorChanged: widget.onThemeColorChanged,
+            ),
       ),
     );
   }
@@ -927,46 +1177,672 @@ class _MemeHomePageState extends State<MemeHomePage>
   }
 
   // Add meme to favorites
-  void addToFavorites(Meme meme) {
-    if (!favoriteMemes.any((m) => m.url == meme.url)) {
-      setState(() {
-        favoriteMemes.add(meme);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('❤️ Added to favorites!'),
-          backgroundColor: const Color(0xFFE91E63),
-          behavior: SnackBarBehavior.floating,
-          action: SnackBarAction(
-            label: 'View Favorites',
-            textColor: Colors.white,
-            onPressed: () {
-              Scaffold.of(context).openDrawer();
-            },
-          ),
-        ),
-      );
-    } else {
+  Future<void> addToFavorites(Meme meme) async {
+    // The MemeCard now handles the actual favorite toggle and feedback
+    // This method is called to refresh the parent's favorites list
+    await _loadFavorites(); // Reload favorites from storage
+  }
+
+  // Remove meme from favorites
+  Future<void> removeFromFavorites(Meme meme) async {
+    final success = await FavoritesService.removeFromFavorites(meme);
+    if (success && mounted) {
+      await _loadFavorites(); // Reload favorites from storage
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Already in favorites! ❤️'),
-          backgroundColor: Color(0xFFFF5722),
+          content: Text('Removed from favorites 💔'),
+          backgroundColor: Color(0xFF9C27B0),
           behavior: SnackBarBehavior.floating,
         ),
       );
     }
   }
+}
 
-  // Remove meme from favorites
-  void removeFromFavorites(Meme meme) {
+class _TrendingMemesScreen extends StatefulWidget {
+  @override
+  State<_TrendingMemesScreen> createState() => _TrendingMemesScreenState();
+}
+
+class _TrendingMemesScreenState extends State<_TrendingMemesScreen> {
+  List<Meme> trendingMemes = [];
+  bool isLoading = true;
+  bool isError = false;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    fetchTrendingMemes();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> fetchTrendingMemes() async {
     setState(() {
-      favoriteMemes.removeWhere((m) => m.url == meme.url);
+      isLoading = true;
+      isError = false;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Removed from favorites 💔'),
-        backgroundColor: Color(0xFF9C27B0),
-        behavior: SnackBarBehavior.floating,
+
+    try {
+      final fetchedMemes = await MemeService.fetchTrendingMemes(context);
+      if (!mounted) return;
+
+      setState(() {
+        trendingMemes = fetchedMemes ?? [];
+        isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+        isError = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Trending Memes'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF2196F3).withAlpha(16),
+              const Color(0xFFFF9800).withAlpha(12),
+              const Color(0xFF9C27B0).withAlpha(8),
+              colorScheme.surface,
+            ],
+            stops: const [0.0, 0.3, 0.7, 1.0],
+          ),
+        ),
+        child: RefreshIndicator(
+          onRefresh: fetchTrendingMemes,
+          backgroundColor: colorScheme.surface,
+          color: colorScheme.primary,
+          child: _buildBody(colorScheme),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.pop(context);
+        },
+        icon: const Icon(Icons.arrow_back_rounded),
+        label: const Text("Back"),
+        backgroundColor: const Color(0xFF2196F3),
+        foregroundColor: Colors.white,
+        elevation: 12,
+      ),
+    );
+  }
+
+  Widget _buildBody(ColorScheme colorScheme) {
+    if (isLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF2196F3).withAlpha(32),
+                    Colors.transparent,
+                  ],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: CircularProgressIndicator(
+                strokeWidth: 4,
+                valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+              ),
+            ),
+            const SizedBox(height: 32),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF2196F3).withAlpha(32),
+                    const Color(0xFFFF9800).withAlpha(32),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(25),
+              ),
+              child: Text(
+                '🔥 Loading trending memes...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (isError) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFFFF5722).withAlpha(16),
+                  const Color(0xFFFF9800).withAlpha(16),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: const Color(0xFFFF5722).withAlpha(48),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const RadialGradient(
+                      colors: [Color(0xFFFF5722), Color(0xFFFF9800)],
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.cloud_off_rounded,
+                    size: 48,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "Oops! Couldn't load trending memes",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Check your internet connection and try again",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2196F3), Color(0xFF00BCD4)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2196F3).withAlpha(64),
+                        blurRadius: 15,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: FilledButton.icon(
+                    onPressed: fetchTrendingMemes,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text("Try Again"),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (trendingMemes.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFFFF9800).withAlpha(32),
+                    Colors.transparent,
+                  ],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.sentiment_dissatisfied_rounded,
+                size: 64,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              "No trending memes found",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Try refreshing to load some fresh content",
+              style: TextStyle(
+                fontSize: 14,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return CustomScrollView(
+      controller: _scrollController,
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 1,
+              childAspectRatio: 0.75,
+              mainAxisSpacing: 20,
+            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final meme = trendingMemes[index];
+              return MemeCard(
+                title: meme.title ?? '',
+                imageUrl: meme.url ?? '',
+                ups: meme.ups ?? 0,
+                postLink: meme.postLink ?? '',
+                index: index,
+                subreddit: meme.subreddit ?? '',
+              );
+            }, childCount: trendingMemes.length),
+          ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 100)),
+      ],
+      physics: const BouncingScrollPhysics(),
+    );
+  }
+}
+
+class _SettingsScreen extends StatefulWidget {
+  final bool isDarkMode;
+  final void Function(bool) onToggleDarkMode;
+  final String themeColor;
+  final void Function(String) onThemeColorChanged;
+  const _SettingsScreen({
+    Key? key,
+    required this.isDarkMode,
+    required this.onToggleDarkMode,
+    required this.themeColor,
+    required this.onThemeColorChanged,
+  }) : super(key: key);
+  @override
+  State<_SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<_SettingsScreen> {
+  late bool _darkMode;
+  bool _notificationsEnabled = true;
+  bool _autoPlayVideos = true;
+  late String _selectedTheme;
+
+  @override
+  void initState() {
+    super.initState();
+    _darkMode = widget.isDarkMode;
+    _selectedTheme = widget.themeColor;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Settings'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF9C27B0).withAlpha(5),
+              const Color(0xFF2196F3).withAlpha(3),
+              const Color(0xFFE91E63).withAlpha(2),
+              colorScheme.surface,
+            ],
+            stops: const [0.0, 0.3, 0.7, 1.0],
+          ),
+        ),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildSectionHeader('Appearance', Icons.palette_outlined),
+            _buildSettingCard(
+              title: 'Dark Mode',
+              subtitle: 'Enable dark theme for the app',
+              icon: Icons.dark_mode_outlined,
+              trailing: Switch(
+                value: _darkMode,
+                onChanged: (value) {
+                  setState(() {
+                    _darkMode = value;
+                  });
+                  widget.onToggleDarkMode(value);
+                },
+                activeColor: const Color(0xFF9C27B0),
+              ),
+            ),
+            _buildSettingCard(
+              title: 'App Theme',
+              subtitle: 'Choose your preferred theme color',
+              icon: Icons.color_lens_outlined,
+              trailing: DropdownButton<String>(
+                value: _selectedTheme,
+                items:
+                    ['Default', 'Blue', 'Green', 'Orange']
+                        .map(
+                          (theme) => DropdownMenuItem(
+                            value: theme,
+                            child: Text(theme),
+                          ),
+                        )
+                        .toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _selectedTheme = value;
+                    });
+                    widget.onThemeColorChanged(value);
+                  }
+                },
+                underline: Container(),
+              ),
+            ),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Notifications', Icons.notifications_outlined),
+            _buildSettingCard(
+              title: 'Push Notifications',
+              subtitle: 'Get notified about new trending memes',
+              icon: Icons.notifications_active_outlined,
+              trailing: Switch(
+                value: _notificationsEnabled,
+                onChanged: (value) {
+                  setState(() {
+                    _notificationsEnabled = value;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        value
+                            ? 'Notifications enabled'
+                            : 'Notifications disabled',
+                      ),
+                      backgroundColor: const Color(0xFF9C27B0),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                activeColor: const Color(0xFF9C27B0),
+              ),
+            ),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Content', Icons.image_outlined),
+            _buildSettingCard(
+              title: 'Auto-play Videos',
+              subtitle: 'Automatically play video content',
+              icon: Icons.play_circle_outline,
+              trailing: Switch(
+                value: _autoPlayVideos,
+                onChanged: (value) {
+                  setState(() {
+                    _autoPlayVideos = value;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        value
+                            ? 'Videos will auto-play'
+                            : 'Videos will not auto-play',
+                      ),
+                      backgroundColor: const Color(0xFF9C27B0),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                activeColor: const Color(0xFF9C27B0),
+              ),
+            ),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Account', Icons.account_circle_outlined),
+            _buildSettingCard(
+              title: 'Logout',
+              subtitle: 'Sign out of your account',
+              icon: Icons.logout_rounded,
+              onTap: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder:
+                      (context) => AlertDialog(
+                        title: const Text('Logout'),
+                        content: const Text(
+                          'Are you sure you want to logout? You will need to sign in again to access your account.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF5722),
+                            ),
+                            child: const Text('Logout'),
+                          ),
+                        ],
+                      ),
+                );
+
+                if (confirmed == true) {
+                  try {
+                    await FirebaseAuth.instance.signOut();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Successfully logged out 👋'),
+                          backgroundColor: Color(0xFF4CAF50),
+                          behavior: SnackBarBehavior.floating,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                      Navigator.of(context).pop(); // Close settings screen
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error logging out: ${e.toString()}'),
+                          backgroundColor: const Color(0xFFFF5722),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
+            ),
+            const SizedBox(height: 24),
+            _buildSectionHeader('About', Icons.info_outline),
+            _buildSettingCard(
+              title: 'App Version',
+              subtitle: 'Meme Explorer v1.0',
+              icon: Icons.android_outlined,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('You are using the latest version!'),
+                    backgroundColor: Color(0xFF9C27B0),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+            ),
+            _buildSettingCard(
+              title: 'Privacy Policy',
+              subtitle: 'Read our privacy policy',
+              icon: Icons.privacy_tip_outlined,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Privacy policy coming soon!'),
+                    backgroundColor: Color(0xFF9C27B0),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+            ),
+            _buildSettingCard(
+              title: 'Terms of Service',
+              subtitle: 'Read our terms of service',
+              icon: Icons.description_outlined,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Terms of service coming soon!'),
+                    backgroundColor: Color(0xFF9C27B0),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+            Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF9C27B0), Color(0xFF673AB7)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF9C27B0).withAlpha(80),
+                    blurRadius: 15,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                icon: const Icon(Icons.save_rounded),
+                label: const Text("Save Settings"),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFF9C27B0), size: 20),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF9C27B0),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      elevation: 4,
+      shadowColor: Colors.black.withAlpha(32),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16.0,
+          vertical: 8.0,
+        ),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF9C27B0).withAlpha(64),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: const Color(0xFF9C27B0)),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        ),
+        trailing: trailing,
+        onTap: onTap,
       ),
     );
   }
