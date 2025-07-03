@@ -1,6 +1,7 @@
 import 'package:api_integration/models/meme_model.dart';
 import 'package:api_integration/widgets/meme_card.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:api_integration/services/meme_service.dart';
 import 'package:api_integration/services/favorites_service.dart';
 import 'package:api_integration/screens/favorites_screen.dart';
@@ -8,6 +9,132 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:ui';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:api_integration/utils/page_transitions.dart';
+import 'dart:math';
+
+class AnimatedHexBackground extends StatefulWidget {
+  final Widget? child;
+  const AnimatedHexBackground({Key? key, this.child}) : super(key: key);
+
+  @override
+  State<AnimatedHexBackground> createState() => _AnimatedHexBackgroundState();
+}
+
+class _AnimatedHexBackgroundState extends State<AnimatedHexBackground>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 12),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return CustomPaint(
+          painter: HexagonPatternPainter(_controller.value),
+          child: widget.child,
+        );
+      },
+    );
+  }
+}
+
+class HexagonPatternPainter extends CustomPainter {
+  final double progress;
+  HexagonPatternPainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint hexPaint =
+        Paint()
+          ..color = Colors.white.withOpacity(0.07)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.1;
+    final Paint dotPaint =
+        Paint()
+          ..color = Colors.white.withOpacity(0.10)
+          ..style = PaintingStyle.fill;
+    final double hexSize = 32;
+    final double dotRadius = 2.2;
+    final double dx = hexSize * 0.87;
+    final double dy = hexSize * 0.5;
+    final double offset = progress * hexSize * 2;
+    for (double y = -hexSize; y < size.height + hexSize; y += dy * 1.5) {
+      for (double x = -hexSize; x < size.width + hexSize; x += dx) {
+        final evenRow = ((y / dy) % 2).abs() < 1e-6;
+        final px = x + (evenRow ? 0 : dx / 2) + offset;
+        final py = y + offset * 0.5;
+        // Draw hexagon
+        final path = Path();
+        for (int i = 0; i < 6; i++) {
+          final angle = pi / 3 * i;
+          final hx = px + hexSize * cos(angle);
+          final hy = py + hexSize * sin(angle);
+          if (i == 0) {
+            path.moveTo(hx, hy);
+          } else {
+            path.lineTo(hx, hy);
+          }
+        }
+        path.close();
+        canvas.drawPath(path, hexPaint);
+        // Draw dot at center
+        canvas.drawCircle(Offset(px, py), dotRadius, dotPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant HexagonPatternPainter oldDelegate) => true;
+}
+
+class DottedTexturePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final dotPaint =
+        Paint()
+          ..color = Colors.white.withOpacity(0.07)
+          ..style = PaintingStyle.fill;
+    final darkDotPaint =
+        Paint()
+          ..color = const Color(0xFF1E293B).withOpacity(0.10)
+          ..style = PaintingStyle.fill;
+    const double spacing = 7.0;
+    const double radius = 1.1;
+    for (double y = 0; y < size.height; y += spacing) {
+      for (
+        double x = (y ~/ spacing) % 2 == 0 ? 0 : spacing / 2;
+        x < size.width;
+        x += spacing
+      ) {
+        // Alternate between light and dark dots for more depth
+        final isDark = ((x + y) ~/ spacing) % 3 == 0;
+        canvas.drawCircle(
+          Offset(x, y),
+          radius,
+          isDark ? darkDotPaint : dotPaint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
 
 class MemeHomePage extends StatefulWidget {
   final bool isDarkMode;
@@ -214,26 +341,262 @@ class _MemeHomePageState extends State<MemeHomePage>
       extendBodyBehindAppBar: true,
       backgroundColor: colorScheme.surfaceContainerLowest,
       drawer: _buildDrawer(colorScheme),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFFE91E63).withAlpha(5),
-              const Color(0xFF2196F3).withAlpha(3),
-              const Color(0xFFFF9800).withAlpha(2),
-              colorScheme.surface,
+      drawerEnableOpenDragGesture: true,
+      drawerEdgeDragWidth: 60.0,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        toolbarHeight: 80,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF4C6EF5), // Arc browser primary blue
+                Color(0xFF364FC7), // Arc browser darker blue
+                Color(0xFF3B82F6), // Arc browser bright blue
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              stops: [0.0, 0.6, 1.0],
+            ),
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(25),
+              bottomRight: Radius.circular(25),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0xFF4C6EF5).withOpacity(0.4),
+                blurRadius: 25,
+                offset: Offset(0, 10),
+                spreadRadius: 2,
+              ),
+              BoxShadow(
+                color: Color(0xFF364FC7).withOpacity(0.2),
+                blurRadius: 40,
+                offset: Offset(0, 20),
+                spreadRadius: 5,
+              ),
             ],
-            stops: const [0.0, 0.3, 0.7, 1.0],
+          ),
+          child: Stack(
+            children: [
+              // Dotted texture pattern using CustomPaint
+              CustomPaint(
+                painter: DottedTexturePainter(),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(25),
+                      bottomRight: Radius.circular(25),
+                    ),
+                  ),
+                ),
+              ),
+              // Light radial gradient overlay
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(25),
+                    bottomRight: Radius.circular(25),
+                  ),
+                  gradient: RadialGradient(
+                    center: Alignment.topLeft,
+                    radius: 1.2,
+                    colors: [
+                      Colors.white.withOpacity(0.15),
+                      Colors.transparent,
+                      Color(0xFF1E293B).withOpacity(0.08),
+                    ],
+                    stops: [0.0, 0.5, 1.0],
+                  ),
+                ),
+              ),
+              // Top glass reflection
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 35,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(25),
+                      bottomRight: Radius.circular(25),
+                    ),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.2),
+                        Colors.white.withOpacity(0.05),
+                        Colors.transparent,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        child: Column(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _buildAnimatedAppBar(colorScheme),
-            Expanded(
+            Text(
+              'Meme Explorer',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Mixed feed from all categories',
+              style: TextStyle(fontSize: 13, color: Colors.white70),
+            ),
+          ],
+        ),
+        centerTitle: true,
+        leading: Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.25),
+                  Colors.white.withOpacity(0.15),
+                  Colors.white.withOpacity(0.08),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.3),
+                width: 0.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Builder(
+              builder:
+                  (context) => IconButton(
+                    icon: Icon(Icons.menu, color: Colors.white),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      Scaffold.of(context).openDrawer();
+                    },
+                  ),
+            ),
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6.0),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.25),
+                    Colors.white.withOpacity(0.15),
+                    Colors.white.withOpacity(0.08),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 0.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                icon: Icon(Icons.refresh, color: Colors.white),
+                onPressed:
+                    isLoading
+                        ? null
+                        : () async {
+                          HapticFeedback.mediumImpact();
+                          setState(() {
+                            memes.clear();
+                            currentPage = 1;
+                          });
+                          _changeEmoji();
+                          await fetchMemes();
+                        },
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 10.0),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.25),
+                    Colors.white.withOpacity(0.15),
+                    Colors.white.withOpacity(0.08),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 0.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                icon: Icon(Icons.settings, color: Colors.white),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _showSettings(context);
+                },
+              ),
+            ),
+          ),
+        ],
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: AnimatedHexBackground(
+        child: Builder(
+          builder: (BuildContext scaffoldContext) {
+            return GestureDetector(
+              onHorizontalDragEnd: (details) {
+                if (details.primaryVelocity != null &&
+                    details.primaryVelocity! > 500) {
+                  try {
+                    final scaffold = Scaffold.maybeOf(scaffoldContext);
+                    if (scaffold != null && !scaffold.isDrawerOpen) {
+                      scaffold.openDrawer();
+                    }
+                  } catch (e) {
+                    debugPrint('Drawer gesture ignored: $e');
+                  }
+                }
+              },
               child: RefreshIndicator(
                 onRefresh: () async {
+                  HapticFeedback.mediumImpact();
                   setState(() {
                     memes.clear();
                     currentPage = 1;
@@ -245,239 +608,65 @@ class _MemeHomePageState extends State<MemeHomePage>
                 color: colorScheme.primary,
                 child: _buildBody(colorScheme),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
       floatingActionButton: _buildFloatingActionButton(colorScheme),
     );
   }
 
-  Widget _buildAnimatedAppBar(ColorScheme colorScheme) {
-    return Builder(
-      builder:
-          (context) => Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFFE91E63).withAlpha(180),
-                  const Color(0xFF2196F3).withAlpha(160),
-                  const Color(0xFFFF9800).withAlpha(120),
-                  const Color(0xFF9C27B0).withAlpha(120),
-                ],
-                stops: const [0.0, 0.3, 0.7, 1.0],
-              ),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(18),
-                bottomRight: Radius.circular(18),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFE91E63).withAlpha(40),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(18),
-                bottomRight: Radius.circular(18),
-              ),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 7,
+  Widget _buildFloatingActionButton(ColorScheme colorScheme) {
+    return AnimatedBuilder(
+      animation: _scrollController,
+      builder: (context, child) {
+        // Show/hide FAB based on scroll position
+        final showFab =
+            _scrollController.hasClients && _scrollController.offset > 500;
+
+        return AnimatedScale(
+          scale: showFab ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutBack,
+          child: AnimatedOpacity(
+            opacity: showFab ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: FloatingActionButton.extended(
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                _scrollController.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 800),
+                  curve: Curves.easeOutCubic,
+                );
+              },
+              icon: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 600),
+                builder: (context, value, child) {
+                  return Transform.rotate(
+                    angle: value * 0.1,
+                    child: const Icon(
+                      Icons.keyboard_arrow_up_rounded,
+                      size: 24,
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Menu Icon
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFE91E63), Color(0xFFFF5722)],
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFE91E63).withAlpha(40),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: IconButton(
-                            icon: const Icon(
-                              Icons.menu_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            padding: const EdgeInsets.all(4),
-                            onPressed: () {
-                              Scaffold.of(context).openDrawer();
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        // App Icon
-                        GestureDetector(
-                          onTap: _changeEmoji,
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFE91E63), Color(0xFFFF5722)],
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFFE91E63).withAlpha(50),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              _currentEmoji,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        // Title & Subtitle
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              ShaderMask(
-                                shaderCallback:
-                                    (bounds) => const LinearGradient(
-                                      colors: [
-                                        Color(0xFFE91E63),
-                                        Color(0xFF2196F3),
-                                      ],
-                                    ).createShader(bounds),
-                                child: const Text(
-                                  "Meme Explorer",
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    letterSpacing: 0.3,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                "Discover amazing memes",
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: colorScheme.onSurface.withAlpha(160),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Refresh Icon
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFF2196F3).withAlpha(80),
-                                const Color(0xFF9C27B0).withAlpha(80),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: IconButton(
-                            padding: const EdgeInsets.all(4),
-                            icon: Icon(
-                              Icons.refresh_rounded,
-                              color: colorScheme.primary,
-                              size: 18,
-                            ),
-                            onPressed:
-                                isLoading
-                                    ? null
-                                    : () async {
-                                      setState(() {
-                                        memes.clear();
-                                        currentPage = 1;
-                                      });
-                                      _changeEmoji();
-                                      await fetchMemes();
-                                    },
-                            tooltip: 'Refresh memes',
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        // Settings Icon
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFFFF5722).withAlpha(80),
-                                const Color(0xFFE91E63).withAlpha(80),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: IconButton(
-                            padding: const EdgeInsets.all(4),
-                            icon: const Icon(
-                              Icons.settings_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            onPressed: () {
-                              _showSettings(context);
-                            },
-                            tooltip: 'Settings',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                  );
+                },
               ),
+              label: const Text(
+                "Top",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              elevation: 16,
+              hoverElevation: 20,
+              focusElevation: 20,
+              heroTag: "scrollToTop",
             ),
           ),
-    );
-  }
-
-  Widget _buildFloatingActionButton(ColorScheme colorScheme) {
-    return FloatingActionButton.extended(
-      onPressed: () {
-        _scrollController.animateTo(
-          0,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
         );
       },
-      icon: const Icon(Icons.keyboard_arrow_up_rounded),
-      label: const Text("Top"),
-      backgroundColor: const Color(0xFFFF9800).withAlpha(255),
-      foregroundColor: Colors.white,
-      elevation: 12,
     );
   }
 
@@ -666,22 +855,20 @@ class _MemeHomePageState extends State<MemeHomePage>
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 1,
-                childAspectRatio: 0.75,
-                mainAxisSpacing: 20,
-              ),
+            sliver: SliverList(
               delegate: SliverChildBuilderDelegate((context, index) {
                 final meme = memes[index];
-                return MemeCard(
-                  title: meme.title ?? '',
-                  imageUrl: meme.url ?? '',
-                  ups: meme.ups ?? 0,
-                  postLink: meme.postLink ?? '',
-                  index: index,
-                  subreddit: meme.subreddit ?? '',
-                  onAddToFavorites: addToFavorites,
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 20.0),
+                  child: MemeCard(
+                    title: meme.title ?? '',
+                    imageUrl: meme.url ?? '',
+                    ups: meme.ups ?? 0,
+                    postLink: meme.postLink ?? '',
+                    index: index,
+                    subreddit: meme.subreddit ?? '',
+                    onAddToFavorites: addToFavorites,
+                  ),
                 );
               }, childCount: memes.length),
             ),
@@ -1152,6 +1339,7 @@ class _MemeHomePageState extends State<MemeHomePage>
   }
 
   void _showSettings(BuildContext context) {
+    HapticFeedback.lightImpact();
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:
